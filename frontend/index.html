@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>深度视频转换器 · Deep Video Converter</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c232c; --line:#2a313c;
+    --txt:#e6edf3; --muted:#8b97a6; --accent:#4f9dff; --accent2:#36d399;
+    --warn:#ffb454; --err:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:radial-gradient(1200px 600px at 70% -10%,#1a2330 0%,var(--bg) 60%);color:var(--txt);min-height:100vh}
+  .wrap{max-width:880px;margin:0 auto;padding:32px 20px 60px}
+  h1{font-size:26px;margin:0 0 4px;letter-spacing:.5px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:24px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:18px}
+  .drop{border:2px dashed var(--line);border-radius:14px;padding:34px 20px;text-align:center;cursor:pointer;transition:.2s;background:var(--panel2)}
+  .drop:hover,.drop.over{border-color:var(--accent);background:#172230}
+  .drop .big{font-size:15px;margin-bottom:6px}
+  .drop .small{color:var(--muted);font-size:12px}
+  .fname{margin-top:12px;font-size:13px;color:var(--accent2)}
+  .modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+  .mode{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px;cursor:pointer;transition:.15s;position:relative}
+  .mode:hover{border-color:var(--accent)}
+  .mode.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(79,157,255,.25) inset;background:#15233a}
+  .mode .t{font-size:14px;font-weight:600}
+  .mode .d{font-size:11px;color:var(--muted);margin-top:4px}
+  .mode .tag{position:absolute;top:8px;right:8px;font-size:10px;color:var(--muted)}
+  .mode.active .tag{color:var(--accent)}
+  .actions{display:flex;gap:12px;align-items:center;margin-top:18px}
+  button{font:inherit;border:none;border-radius:10px;padding:11px 20px;cursor:pointer;font-weight:600;transition:.15s}
+  .btn-go{background:linear-gradient(135deg,var(--accent),#2b7fff);color:#fff}
+  .btn-go:disabled{opacity:.45;cursor:not-allowed}
+  .btn-dl{background:linear-gradient(135deg,var(--accent2),#1fae7a);color:#06281c}
+  .progress{margin-top:18px}
+  .bar{height:12px;background:var(--panel2);border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+  .bar > i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .3s}
+  .pinfo{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:8px}
+  .stage{font-size:13px;color:var(--txt);margin-top:4px}
+  .hidden{display:none}
+  .err{color:var(--err);font-size:13px;margin-top:10px}
+  .ok{color:var(--accent2)}
+  .note{font-size:11px;color:var(--muted);margin-top:14px;line-height:1.6}
+  code{background:var(--panel2);padding:1px 6px;border-radius:6px;color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>深度视频转换器</h1>
+  <div class="sub">Deep Video Converter · 上传短视频 → 选择效果 → 浏览器下载（保留原声）</div>
+
+  <div class="card">
+    <div id="drop" class="drop">
+      <div class="big">拖拽视频到此处，或点击选择</div>
+      <div class="small">支持 mp4 / mov / webm / avi 等，建议时长 ≤ 15s 以加快处理</div>
+      <input type="file" id="file" accept="video/*" hidden>
+    </div>
+    <div id="fname" class="fname hidden"></div>
+
+    <div style="margin-top:18px;font-size:13px;color:var(--muted)">选择输出模式</div>
+    <div class="modes" id="modes" style="margin-top:10px"></div>
+
+    <div class="actions">
+      <button class="btn-go" id="go" disabled>开始转换</button>
+      <span id="hint" style="font-size:12px;color:var(--muted)">请先上传视频并选择模式</span>
+    </div>
+    <div id="err" class="err hidden"></div>
+  </div>
+
+  <div class="card progress hidden" id="progCard">
+    <div class="stage" id="stage">准备中…</div>
+    <div class="bar"><i id="bar"></i></div>
+    <div class="pinfo"><span id="pct">0%</span><span id="msg"></span></div>
+    <div class="actions" id="dlWrap" style="display:none">
+      <a id="dl" href="#"><button class="btn-dl">⬇ 下载结果视频</button></a>
+    </div>
+  </div>
+
+  <div class="note">
+    处理流水线：<b>面部点云（独立 Python 3.11 / MediaPipe）</b> 先于 <b>深度估计 + 姿态（torch）</b> 执行，进程隔离避免 MPS/Metal 冲突；
+    最终经 ffmpeg 封装并保留原声。处理分辨率上限 480px（可在 <code>backend/config.py</code> 调整 <code>MAX_DIM</code>）。
+  </div>
+</div>
+
+<script>
+const MODES = {
+  depth:{t:"灰度深度图",d:"近亮远暗",tag:"A"},
+  pose:{t:"姿态骨架叠加",d:"KeypointRCNN",tag:"B"},
+  combo:{t:"深度+姿态组合",d:"深度底 + 骨架",tag:"C"},
+  face:{t:"面部478点云",d:"MediaPipe",tag:"D"},
+  all:{t:"以上全部叠加",d:"深度+姿态+面部",tag:"E"},
+};
+let selectedMode=null, fileObj=null;
+
+const modesEl=document.getElementById('modes');
+Object.entries(MODES).forEach(([k,v])=>{
+  const el=document.createElement('div');
+  el.className='mode'; el.dataset.k=k;
+  el.innerHTML=`<div class="tag">${v.tag}</div><div class="t">${v.t}</div><div class="d">${v.d}</div>`;
+  el.onclick=()=>{
+    document.querySelectorAll('.mode').forEach(m=>m.classList.remove('active'));
+    el.classList.add('active'); selectedMode=k; updateGo();
+  };
+  modesEl.appendChild(el);
+});
+
+const drop=document.getElementById('drop'), fileInput=document.getElementById('file'), fnameEl=document.getElementById('fname');
+drop.onclick=()=>fileInput.click();
+fileInput.onchange=e=>{ if(e.target.files[0]) setFile(e.target.files[0]); };
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',e=>{const f=e.dataTransfer.files[0]; if(f) setFile(f);});
+
+function setFile(f){
+  fileObj=f; fnameEl.textContent='已选择: '+f.name+' ('+(f.size/1024/1024).toFixed(1)+' MB)';
+  fnameEl.classList.remove('hidden'); updateGo();
+}
+function updateGo(){
+  const ok=fileObj && selectedMode;
+  document.getElementById('go').disabled=!ok;
+  document.getElementById('hint').textContent = !fileObj ? '请先上传视频并选择模式' : (!selectedMode?'请选择一种模式':'');
+}
+
+const goBtn=document.getElementById('go');
+let timer=null;
+goBtn.onclick=()=>{
+  if(!fileObj||!selectedMode) return;
+  const fd=new FormData(); fd.append('video',fileObj); fd.append('mode',selectedMode);
+  document.getElementById('err').classList.add('hidden');
+  goBtn.disabled=true;
+  fetch('/api/process',{method:'POST',body:fd})
+    .then(r=>r.json()).then(j=>{
+      if(j.error){showErr(j.error);goBtn.disabled=false;return;}
+      startPolling(j.job_id);
+    }).catch(e=>{showErr('请求失败: '+e);goBtn.disabled=false;});
+};
+function showErr(m){const e=document.getElementById('err');e.textContent=m;e.classList.remove('hidden');}
+
+function startPolling(job){
+  document.getElementById('progCard').classList.remove('hidden');
+  document.getElementById('dlWrap').style.display='none';
+  setBar(0,'queued','已提交，准备处理');
+  timer=setInterval(()=>{
+    fetch('/api/status/'+job).then(r=>r.json()).then(s=>{
+      if(s.error){clearInterval(timer);showErr(s.error);return;}
+      setBar(s.progress,s.stage,s.message);
+      if(s.stage==='done'){
+        clearInterval(timer);
+        const dl=document.getElementById('dl');
+        dl.href='/api/download/'+job;
+        document.getElementById('dlWrap').style.display='flex';
+        document.getElementById('stage').innerHTML='<span class="ok">✓ 处理完成</span>';
+        goBtn.disabled=false;
+      } else if(s.stage==='error'){
+        clearInterval(timer); showErr(s.message); goBtn.disabled=false;
+      }
+    }).catch(()=>{});
+  },900);
+}
+function setBar(pct,stage,msg){
+  document.getElementById('bar').style.width=Math.max(0,Math.min(100,pct))+'%';
+  document.getElementById('pct').textContent=Math.round(pct)+'%';
+  document.getElementById('msg').textContent=msg||'';
+  const labels={face:'① 面部点云',depth:'② 深度+姿态',composite:'③ 合成',mux:'④ 封装音视频',queued:'队列',done:'完成'};
+  document.getElementById('stage').textContent=(labels[stage]||stage||'')+'  '+(msg||'');
+}
+</script>
+</body>
+</html>

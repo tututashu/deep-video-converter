@@ -1,0 +1,15 @@
+# 主环境 (env-main) 依赖 — Python 3.12
+# torch / torchvision: 深度估计 (Depth-Anything-V2) + 人体姿态 (KeypointRCNN)
+# transformers: Depth-Anything-V2 HF 接口
+# opencv: 帧读写与合成, flask: Web 服务
+# 注意: torch>=2.4 仅提供 macOS arm64 轮子; 本机为 Intel Mac(x86_64),
+# 故锁定 2.2.2 —— 这是最后一个同时提供 macOS x86_64 / arm64 / Windows 轮子的版本, 跨平台兼容。
+flask==3.0.3
+werkzeug==3.0.4
+numpy==1.26.4
+opencv-python-headless==4.10.0.84
+torch==2.2.2
+torchvision==0.17.2
+transformers==4.44.2
+huggingface_hub==0.25.1
+Pillow==10.4.0

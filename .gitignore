@@ -1,0 +1,24 @@
+# ===== 大文件 / 平台相关, 不入库 =====
+# 虚拟环境 (2.2GB, 与本机 Python 绑定, 由 setup 脚本重建)
+venvs/
+
+# 模型权重 (334MB; setup.sh / setup.bat 会自动下载。
+#  其中 keypointrcnn_resnet50_fpn.pth 226MB, 超过 GitHub 100MB 单文件硬上限)
+models/
+
+# 处理中间产物与结果 (运行时自动生成)
+jobs/
+
+# 测试/调试用临时文件 (含真人测试视频, 公开仓库不建议上传)
+tmp/
+
+# 端到端验证产物 (含真人出镜视频, 公开仓库建议不上传; 可用自制 demo 代替)
+verification_outputs/
+
+# ===== Python / 系统杂项 =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.DS_Store
+Thumbs.db
+*.log

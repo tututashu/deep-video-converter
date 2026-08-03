@@ -1,0 +1,4 @@
+# 面部环境 (env-face) 依赖 — Python 3.11 (独立环境, 与 torch/MPS 隔离)
+# MediaPipe FaceLandmarker: 478 点面部点云
+mediapipe==0.10.14
+numpy==1.26.4
