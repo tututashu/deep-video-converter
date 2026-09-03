@@ -3,6 +3,7 @@ setlocal enabledelayedexpansion
 chcp 65001 >nul
 cd /d "%~dp0\.."
 set "HF_ENDPOINT=https://hf-mirror.com"
+if not defined RELEASE_BASE set "RELEASE_BASE=https://github.com/tututashu/deep-video-converter/releases/download/models-v1"
 echo [*] HF 模型源: %HF_ENDPOINT%
 
 where py >nul 2>nul || (
@@ -21,15 +22,19 @@ venvs\env-face\Scripts\pip install -r backend\requirements_face.txt
 
 mkdir models\face_landmarker models\face_detector models\depth_anything_v2 models\keypointrcnn 2>nul
 
-rem ---------- 模型下载 (官方源优先, 镜像自动降级) ----------
-rem 通过 MIRROR_MEDIAPIPE / MIRROR_PYTORCH 环境变量可挂载自建/社区镜像(URL 目录前缀)。
+rem ---------- 模型下载: 官方源优先 → MIRROR 镜像 → GitHub Releases 分卷兜底 ----------
+rem MIRROR_MEDIAPIPE / MIRROR_PYTORCH 可挂自建镜像; RELEASE_BASE 可覆盖分卷地址。
 
 if not exist "models\face_landmarker\face_landmarker.task" (
   echo [*] 下载 face_landmarker.task …
   set "OK=0"
   curl -f -sSL --connect-timeout 10 --retry 2 -o "models\face_landmarker\face_landmarker.task" "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task" && set "OK=1"
   if not "!OK!"=="1" if defined MIRROR_MEDIAPIPE curl -f -sSL --connect-timeout 10 -o "models\face_landmarker\face_landmarker.task" "%MIRROR_MEDIAPIPE%/face_landmarker/face_landmarker/float16/1/face_landmarker.task" && set "OK=1"
-  if not "!OK!"=="1" echo [!] 提示: 可设置 MIRROR_MEDIAPIPE=镜像目录 后重跑, 或从可达机器拷贝 models\ 目录
+  if not "!OK!"=="1" (
+    echo [*] 官方源不可达, 尝试 GitHub Releases 分卷 models_face.zip …
+    curl -f -sSL --connect-timeout 15 --retry 3 -o "%TEMP%\models_face.zip" "%RELEASE_BASE%/models_face.zip" && tar -xf "%TEMP%\models_face.zip" -C . && del "%TEMP%\models_face.zip"
+    if not exist "models\face_landmarker\face_landmarker.task" echo [!] 手动方案: 设 MIRROR_MEDIAPIPE 镜像重跑, 或从可达机器拷贝 models\
+  )
 )
 
 if not exist "models\face_detector\blaze_face_short_range.tflite" (
@@ -37,13 +42,21 @@ if not exist "models\face_detector\blaze_face_short_range.tflite" (
   set "OK=0"
   curl -f -sSL --connect-timeout 10 --retry 2 -o "models\face_detector\blaze_face_short_range.tflite" "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.tflite" && set "OK=1"
   if not "!OK!"=="1" if defined MIRROR_MEDIAPIPE curl -f -sSL --connect-timeout 10 -o "models\face_detector\blaze_face_short_range.tflite" "%MIRROR_MEDIAPIPE%/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.tflite" && set "OK=1"
-  if not "!OK!"=="1" echo [!] 提示: 同上, 可设置 MIRROR_MEDIAPIPE 或拷贝 models\ 目录
+  if not "!OK!"=="1" (
+    echo [*] 官方源不可达, 尝试 GitHub Releases 分卷 models_face.zip …
+    curl -f -sSL --connect-timeout 15 --retry 3 -o "%TEMP%\models_face.zip" "%RELEASE_BASE%/models_face.zip" && tar -xf "%TEMP%\models_face.zip" -C . && del "%TEMP%\models_face.zip"
+    if not exist "models\face_detector\blaze_face_short_range.tflite" echo [!] 手动方案: 设 MIRROR_MEDIAPIPE 镜像重跑, 或从可达机器拷贝 models\
+  )
 )
 
 if not exist "models\depth_anything_v2\config.json" (
   echo [*] 下载 Depth-Anything-V2-Small-hf (源: %HF_ENDPOINT%) …
   set "HF_ENDPOINT=%HF_ENDPOINT%" && venvs\env-main\Scripts\python.exe -c "from huggingface_hub import snapshot_download; snapshot_download('depth-anything/Depth-Anything-V2-Small-hf', local_dir='models/depth_anything_v2')"
-  if errorlevel 1 echo [!] Depth 下载失败: 若 %HF_ENDPOINT% 不可达, 设 HF_ENDPOINT=https://huggingface.co 重跑, 或拷贝 models\ 目录
+  if errorlevel 1 (
+    echo [*] HF 源失败, 尝试 GitHub Releases 分卷 models_depth.zip …
+    curl -f -sSL --connect-timeout 15 --retry 3 -o "%TEMP%\models_depth.zip" "%RELEASE_BASE%/models_depth.zip" && tar -xf "%TEMP%\models_depth.zip" -C . && del "%TEMP%\models_depth.zip"
+    if not exist "models\depth_anything_v2\config.json" echo [!] 手动方案: 换 HF_ENDPOINT=https://huggingface.co 重跑, 或从可达机器拷贝 models\
+  )
 )
 
 if not exist "models\keypointrcnn\keypointrcnn_resnet50_fpn.pth" (
@@ -51,7 +64,11 @@ if not exist "models\keypointrcnn\keypointrcnn_resnet50_fpn.pth" (
   set "OK=0"
   curl -f -sSL --connect-timeout 10 --retry 2 -o "models\keypointrcnn\keypointrcnn_resnet50_fpn.pth" "https://download.pytorch.org/models/keypointrcnn_resnet50_fpn_coco-9f466800.pth" && set "OK=1"
   if not "!OK!"=="1" if defined MIRROR_PYTORCH curl -f -sSL --connect-timeout 10 -o "models\keypointrcnn\keypointrcnn_resnet50_fpn.pth" "%MIRROR_PYTORCH%/models/keypointrcnn_resnet50_fpn_coco-9f466800.pth" && set "OK=1"
-  if not "!OK!"=="1" echo [!] 提示: 可设置 MIRROR_PYTORCH=镜像目录 后重跑, 或从可达机器拷贝 models\ 目录
+  if not "!OK!"=="1" (
+    echo [*] 官方源不可达, 尝试 GitHub Releases 分卷 models_keypointrcnn.zip …
+    curl -f -sSL --connect-timeout 15 --retry 3 -o "%TEMP%\models_keypointrcnn.zip" "%RELEASE_BASE%/models_keypointrcnn.zip" && tar -xf "%TEMP%\models_keypointrcnn.zip" -C . && del "%TEMP%\models_keypointrcnn.zip"
+    if not exist "models\keypointrcnn\keypointrcnn_resnet50_fpn.pth" echo [!] 手动方案: 设 MIRROR_PYTORCH 镜像重跑, 或从可达机器拷贝 models\
+  )
 )
 
 echo.
