@@ -48,6 +48,71 @@ fetch_release_zip() {
   return 1
 }
 
+# ---------- 0c. 系统前置检查 / 自动安装 ----------
+# 缺 python3.11 / 3.12+ / ffmpeg 时: 默认打印指引并退出;
+# 设 AUTO_INSTALL_PREREQS=1 则自动安装 (macOS/Homebrew 与 Windows/winget 免 sudo 可全自动; Linux 需免密 sudo)。
+ensure_prereqs() {
+  local miss=""
+  command -v python3.11 >/dev/null 2>&1 || miss="$miss python3.11"
+  { command -v python3.12 >/dev/null 2>&1 || command -v python3 >/dev/null 2>&1; } || miss="$miss python3.12"
+  command -v ffmpeg >/dev/null 2>&1 || miss="$miss ffmpeg"
+  if [ -z "$miss" ]; then
+    echo "[✓] 系统前置齐全 (python3.11 / python3.12+ / ffmpeg)"
+    return 0
+  fi
+  echo "[!] 缺少系统前置:$miss"
+
+  if [ "$AUTO_INSTALL_PREREQS" = "1" ]; then
+    case "$(uname -s)" in
+      Darwin)
+        if ! command -v brew >/dev/null 2>&1; then
+          echo "[✗] 自动安装需要 Homebrew, 请先执行: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+          exit 1
+        fi
+        echo "[*] brew 自动安装中 (python@3.11 / python@3.12 / ffmpeg) …"
+        brew install python@3.11 python@3.12 ffmpeg
+        export PATH="$(brew --prefix)/bin:$PATH"
+        ;;
+      Linux)
+        if ! sudo -n true 2>/dev/null; then
+          echo "[✗] Linux 自动安装需要免密 sudo; 请手动执行:"
+          echo "    sudo add-apt-repository -y ppa:deadsnakes/ppa && sudo apt-get update"
+          echo "    sudo apt-get install -y python3.11 python3.12 ffmpeg"
+          exit 1
+        fi
+        echo "[*] apt 自动安装中 …"
+        sudo add-apt-repository -y ppa:deadsnakes/ppa 2>/dev/null || true
+        sudo apt-get update
+        sudo apt-get install -y python3.11 python3.12 ffmpeg
+        ;;
+      *)
+        echo "[✗] 未知系统, 请手动安装 python3.11 / 3.12+ / ffmpeg 后重跑"
+        exit 1
+        ;;
+    esac
+    # 复查
+    if command -v python3.11 >/dev/null 2>&1 \
+       && { command -v python3.12 >/dev/null 2>&1 || command -v python3 >/dev/null 2>&1; } \
+       && command -v ffmpeg >/dev/null 2>&1; then
+      echo "[✓] 自动安装完成, 前置就绪"
+      return 0
+    fi
+    echo "[✗] 自动安装后仍缺前置, 请手动处理"
+    exit 1
+  fi
+
+  echo "[i] 两种解决方式:"
+  echo "    1) 设 AUTO_INSTALL_PREREQS=1 重跑本脚本, 自动安装"
+  echo "    2) 手动安装:"
+  case "$(uname -s)" in
+    Darwin) echo "       brew install python@3.11 python@3.12 ffmpeg" ;;
+    Linux)  echo "       sudo add-apt-repository -y ppa:deadsnakes/ppa && sudo apt-get update && sudo apt-get install -y python3.11 python3.12 ffmpeg" ;;
+    *)      echo "       从 python.org / ffmpeg.org 安装并加入 PATH" ;;
+  esac
+  exit 1
+}
+ensure_prereqs
+
 # ---------- 1. 解释器检查 ----------
 PYMAIN="$(command -v python3.12 || command -v python3)"
 PYFACE="$(command -v python3.11 || true)"
