@@ -12,7 +12,7 @@ echo "[*] HF 模型源: $HF_ENDPOINT"
 
 # ---------- 0. 源候选与降级下载器 ----------
 # 用法: fetch_fallback <输出文件> <url1> [url2 ...]
-# 依次尝试: 官方源 → (若设置了镜像环境变量) 镜像 → 全部失败给出指引。
+# 依次尝试: 官方源 → (若设置了镜像环境变量) 镜像 → 全部失败返回 1。
 # 通过 MIRROR_MEDIAPIPE / MIRROR_PYTORCH 环境变量可挂载自建/社区镜像
 # (把值替换为目标文件 URL 的目录前缀即可)。
 fetch_fallback() {
@@ -29,6 +29,22 @@ fetch_fallback() {
     rm -f "$out"
   done
   echo "[✗] 所有候选源均下载失败: $out"
+  return 1
+}
+
+# ---------- 0b. GitHub Releases 分卷兜底 ----------
+# 官方源整体不可达时, 从本项目 Releases 下载模型分卷 (zip 内含 models/ 前缀, 解压到项目根即可)。
+# RELEASE_BASE 可覆盖为你的镜像/自托管地址。
+RELEASE_BASE="${RELEASE_BASE:-https://github.com/tututashu/deep-video-converter/releases/download/models-v1}"
+fetch_release_zip() {
+  local zipname="$1" tmp="${TMPDIR:-/tmp}/$zipname"
+  echo "[*] 官方源不可达, 尝试 GitHub Releases 分卷: $zipname"
+  if curl -f -sSL --connect-timeout 15 --retry 3 --retry-delay 2 -o "$tmp" "$RELEASE_BASE/$zipname" 2>/dev/null && [ -s "$tmp" ]; then
+    echo "[✓] 分卷下载完成, 解压到项目根…"
+    unzip -o "$tmp" -d . && rm -f "$tmp" && echo "[✓] $zipname 就绪" && return 0
+  fi
+  rm -f "$tmp"
+  echo "[✗] Releases 分卷也失败: $zipname"
   return 1
 }
 
@@ -85,7 +101,8 @@ if [ ! -f models/face_landmarker/face_landmarker.task ]; then
   fetch_fallback models/face_landmarker/face_landmarker.task \
     "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task" \
     "${MIRROR_MEDIAPIPE:+${MIRROR_MEDIAPIPE}/face_landmarker/face_landmarker/float16/1/face_landmarker.task}" \
-    || echo "[!] 提示: 国内网络可设置 MIRROR_MEDIAPIPE=<镜像目录> 后重跑; 或从可达机器拷贝 models/ 目录"
+    || fetch_release_zip models_face.zip \
+    || echo "[!] 手动方案: 设 MIRROR_MEDIAPIPE 镜像重跑, 或从可达机器拷贝 models/"
 fi
 
 if [ ! -f models/face_detector/blaze_face_short_range.tflite ]; then
@@ -93,7 +110,8 @@ if [ ! -f models/face_detector/blaze_face_short_range.tflite ]; then
   fetch_fallback models/face_detector/blaze_face_short_range.tflite \
     "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.tflite" \
     "${MIRROR_MEDIAPIPE:+${MIRROR_MEDIAPIPE}/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.tflite}" \
-    || echo "[!] 提示: 同上, 可设置 MIRROR_MEDIAPIPE 或拷贝 models/"
+    || fetch_release_zip models_face.zip \
+    || echo "[!] 手动方案: 设 MIRROR_MEDIAPIPE 镜像重跑, 或从可达机器拷贝 models/"
 fi
 
 if [ ! -f models/depth_anything_v2/config.json ]; then
@@ -103,7 +121,9 @@ from huggingface_hub import snapshot_download
 snapshot_download("depth-anything/Depth-Anything-V2-Small-hf", local_dir="models/depth_anything_v2")
 PY
   then
-    echo "[!] Depth 模型下载失败: 若 $HF_ENDPOINT 不可达, 可设 HF_ENDPOINT=https://huggingface.co 重跑, 或拷贝 models/ 目录"
+    echo "[!] HF 源失败, 尝试 Releases 分卷…"
+    fetch_release_zip models_depth.zip \
+      || echo "[!] 手动方案: 换 HF_ENDPOINT=https://huggingface.co 重跑, 或从可达机器拷贝 models/"
   fi
 fi
 
@@ -112,7 +132,8 @@ if [ ! -f models/keypointrcnn/keypointrcnn_resnet50_fpn.pth ]; then
   fetch_fallback models/keypointrcnn/keypointrcnn_resnet50_fpn.pth \
     "https://download.pytorch.org/models/keypointrcnn_resnet50_fpn_coco-9f466800.pth" \
     "${MIRROR_PYTORCH:+${MIRROR_PYTORCH}/models/keypointrcnn_resnet50_fpn_coco-9f466800.pth}" \
-    || echo "[!] 提示: 可设置 MIRROR_PYTORCH=<镜像目录> 后重跑; 或从可达机器拷贝 models/ 目录"
+    || fetch_release_zip models_keypointrcnn.zip \
+    || echo "[!] 手动方案: 设 MIRROR_PYTORCH 镜像重跑, 或从可达机器拷贝 models/"
 fi
 
 echo ""
