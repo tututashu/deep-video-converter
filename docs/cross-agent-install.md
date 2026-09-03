@@ -1,6 +1,6 @@
-# 在 Claude Code / Codex 中使用本 Skill
+# 在 Claude Code / Codex 等 Agent 中使用本 Skill
 
-本 skill 遵循 **Agent Skills（SKILL.md）开放标准**：一个 `SKILL.md`（YAML frontmatter 声明 name + description）+ 可选 `references/` 资源目录。因此不止 WorkBuddy，**Claude Code、OpenAI Codex CLI** 等主流 agent 都能直接识别并使用，无需改写格式。
+本 skill 遵循 **Agent Skills（SKILL.md）开放标准**：一个 `SKILL.md`（YAML frontmatter 声明 name + description）+ 可选 `references/` 资源目录。**Claude Code、OpenAI Codex CLI、WorkBuddy** 等主流 agent 都能直接识别并使用，无需改写格式。
 
 > 只需把本仓库内容放到对应工具的 skills 目录即可。目录结构即 skill：`SKILL.md` 必须在顶层。
 
@@ -45,6 +45,7 @@ git clone https://github.com/tututashu/deep-video-converter-skill.git <你的项
 ```bash
 rm -rf ~/.claude/skills/deep-video-converter   # Claude Code
 rm -rf ~/.codex/skills/deep-video-converter    # Codex
+rm -rf ~/.workbuddy/skills/deep-video-converter # WorkBuddy
 ```
 
 ## 注意事项
@@ -52,4 +53,4 @@ rm -rf ~/.codex/skills/deep-video-converter    # Codex
 - **保持同步**：本 skill 随 [deep-video-converter-skill](https://github.com/tututashu/deep-video-converter-skill) 仓库更新。改动后在新会话中 `git -C ~/.claude/skills/deep-video-converter pull`（或重跑 clone）即可拿到最新版。
 - **Codex 版本**：Codex 对 SKILL.md 的支持随 CLI 版本演进，如遇未识别请升级 Codex CLI；面向 Codex 专属增强（如 MCP 工具依赖）可另加可选 `openai.yaml`，其他 agent 会忽略该文件。
 - **运行前提**：skill 本身只承载操作指引，真正运行 deep-video-converter 仍需本机满足前置条件（Python 3.11 + 3.12、ffmpeg，首次联网下载模型 ~450MB），详见主文件 `SKILL.md` 的「One-shot setup」。
-- 本机同时使用 WorkBuddy 时，skill 源以 `~/.workbuddy/skills/deep-video-converter` 为准，各工具目录是它的副本。
+- 本仓库是唯一维护源，各 agent 目录里的副本均为其安装；更新后重跑 clone（或 `git pull`）即可。
