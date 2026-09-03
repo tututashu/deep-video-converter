@@ -6,10 +6,30 @@ set "HF_ENDPOINT=https://hf-mirror.com"
 if not defined RELEASE_BASE set "RELEASE_BASE=https://github.com/tututashu/deep-video-converter/releases/download/models-v1"
 echo [*] HF 模型源: %HF_ENDPOINT%
 
-where py >nul 2>nul || (
-  echo [!] 未找到 py 启动器, 请安装 Python 3.11 与 3.12 并勾选 "Add to PATH"
-  pause
-  exit /b 1
+rem ---------- 系统前置检查 / 自动安装 (AUTO_INSTALL_PREREQS=1 自动装) ----------
+set "NEED=0"
+where py >nul 2>nul || set "NEED=1"
+where ffmpeg >nul 2>nul || set "NEED=1"
+if "%NEED%"=="0" (
+  echo [*] 系统前置齐全 (Python 3.11/3.12 + ffmpeg)
+) else (
+  echo [!] 缺少系统前置: Python(py 启动器) 或 ffmpeg
+  if /i "%AUTO_INSTALL_PREREQS%"=="1" (
+    where winget >nul 2>nul || ( echo [!] 未找到 winget, 请从 python.org / ffmpeg.org 手动安装 & pause & exit /b 1 )
+    echo [*] winget 自动安装中: Python 3.11 / 3.12 / FFmpeg …
+    winget install -e --id Python.Python.3.11 --accept-source-agreements --accept-package-agreements --silent
+    winget install -e --id Python.Python.3.12 --accept-source-agreements --accept-package-agreements --silent
+    winget install -e --id Gyan.FFmpeg --accept-source-agreements --accept-package-agreements --silent
+    where py >nul 2>nul || ( echo [!] 装完仍无 py 启动器: 请重开终端后重跑本脚本 & pause & exit /b 1 )
+    where ffmpeg >nul 2>nul || ( echo [!] 装完仍无 ffmpeg: 请重开终端后重跑本脚本 & pause & exit /b 1 )
+    echo [*] 自动安装完成, 前置就绪
+  ) else (
+    echo [i] 两种解决方式:
+    echo     1) 设 AUTO_INSTALL_PREREQS=1 后重跑本脚本, 自动安装
+    echo     2) 手动: winget install -e --id Python.Python.3.11 Python.Python.3.12 Gyan.FFmpeg
+    pause
+    exit /b 1
+  )
 )
 
 if not exist "venvs\env-main\Scripts\python.exe" py -3.12 -m venv venvs\env-main
