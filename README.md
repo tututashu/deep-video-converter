@@ -48,17 +48,41 @@ deep-video-converter/
 ```
 
 ## 运行
-需要先安装 **ffmpeg**（`Mac: brew install ffmpeg`；`Win` 从 ffmpeg.org 安装并加入 PATH）。
+
+### 系统前置（Python + ffmpeg）
+
+需要 **Python 3.11**（人脸环境）+ **Python 3.12 / 3.10+**（主环境），以及 **ffmpeg**（在 PATH 内）。
+
+**方式一：自动安装（推荐）** —— 首次运行 `setup.sh` 时若检测到缺失，设 `AUTO_INSTALL_PREREQS=1` 即自动补齐（macOS/Homebrew 与 Windows/winget 免 sudo 可全自动；Linux 需免密 sudo）：
 
 ```bash
 # Mac / Linux
-bash scripts/setup.sh     # 首次：建环境 + 下模型（幂等）
+AUTO_INSTALL_PREREQS=1 bash scripts/setup.sh
+
+# Windows
+set AUTO_INSTALL_PREREQS=1 && scripts\setup.bat
+```
+
+**方式二：手动安装参考**
+- Mac：`brew install python@3.11 python@3.12 ffmpeg`
+- Win：`winget install -e --id Python.Python.3.11 Python.Python.3.12 Gyan.FFmpeg`（或从 python.org / ffmpeg.org 安装并加入 PATH）
+- Linux：`sudo add-apt-repository -y ppa:deadsnakes/ppa && sudo apt-get update && sudo apt-get install -y python3.11 python3.12 ffmpeg`
+
+不设 `AUTO_INSTALL_PREREQS` 时，setup 检测到缺失会打印上述命令并停下，避免误装系统包。
+
+### 首次启动
+
+```bash
+# Mac / Linux
+bash scripts/setup.sh     # 首次：建双 venv + 下载模型（幂等）
 bash scripts/run.sh       # 启动，打开 http://localhost:8000
 
 # Windows
 scripts\setup.bat
 scripts\run.bat
 ```
+
+> 模型下载自动降级：官方源 → `MIRROR_MEDIAPIPE` / `MIRROR_PYTORCH` 镜像 → GitHub Releases 分卷（[models-v1](https://github.com/tututashu/deep-video-converter/releases/tag/models-v1)，可用 `RELEASE_BASE` 覆盖）→ 手动拷贝指引。
 
 自定义端口：`PORT=9000 bash scripts/run.sh`
 
