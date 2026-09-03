@@ -2,6 +2,13 @@
 
 本地、私有、网页版视频特效工具。上传一段短视频，浏览器内选择效果并下载结果（**保留原声**）。
 
+## 配套 Skill（WorkBuddy / Claude Code / Codex）
+
+本项目附带跨 agent 的 SKILL.md 技能包，可让 AI 一键完成本工具的安装、启动、五种模式使用、CLI 验证与故障排查：
+
+- Skill 仓库：[tututashu/deep-video-converter-skill](https://github.com/tututashu/deep-video-converter-skill)
+- 安装指南：[docs/cross-agent-install.md](docs/cross-agent-install.md)
+
 ## 支持的效果模式
 | 标识 | 模式 | 技术 |
 |------|------|------|
